@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import imperiumLogo from "./assets/imperiumLogo.png";
+import imperiumBG from "./assets/bg-imperium.jpeg";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AnimatePresence, motion } from "framer-motion";
@@ -121,6 +122,7 @@ export default function App() {
       <div className="absolute inset-0">
         <video
           ref={videoARef}
+          poster={imperiumBG}
           className={[
             "absolute inset-0 h-full bg-black w-full object-cover blur-sm scale-110",
             "transition-opacity duration-700 bg-black",
@@ -134,6 +136,7 @@ export default function App() {
         />
         <video
           ref={videoBRef}
+          poster={imperiumBG}
           className={[
             "absolute inset-0 h-full w-full object-cover blur-sm scale-110",
             "transition-opacity duration-700 bg-black",
