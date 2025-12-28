@@ -1,0 +1,29 @@
+Estoy desarrollando una web para un juego de mesa llamada Imperium, pensada principalmente para móviles y tablets.
+
+El stack es React + Vite + TypeScript, con Tailwind CSS y shadcn/ui para una UI moderna. Uso Framer Motion para animaciones y lucide-react para iconos.
+
+La app tiene una pantalla de intro con:
+
+logo centrado que anima (sube ligeramente al cargar)
+
+fondo de vídeos en bucle, con varios vídeos reproducidos en orden aleatorio, usando doble <video> con crossfade para evitar saltos, siempre difuminados (blur) y con overlay oscuro
+
+botón “Jugar” con estilo outline dorado (imperial), que al pulsarlo se oculta
+
+Tras pulsar “Jugar”, aparecen dos botones horizontales:
+
+Individual (icono persona)
+
+Grupo (icono varias personas)
+
+Todo mantiene el mismo estilo visual (shadcn + borde dorado suave). La navegación entre pantallas se hace sin router, solo con useState y AnimatePresence.
+
+El código ya incluye:
+
+lógica de playlist aleatoria de vídeos (sin repetir el mismo al empezar)
+
+doble buffer de vídeo con crossfade
+
+animaciones cuidadas para intro y transiciones
+
+Quiero seguir construyendo la lógica del juego a partir de aquí.
