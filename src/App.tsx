@@ -116,14 +116,14 @@ export default function App() {
     players.length === groupCount && players.every((n) => n.trim().length > 0);
 
   return (
-    <div className="relative min-h-svh w-full overflow-hidden">
+    <div className="relative min-h-[100dvh] w-full inset-0 overflow-hidden bg-black">
       {/* Video background */}
       <div className="absolute inset-0">
         <video
           ref={videoARef}
           className={[
             "absolute inset-0 h-full bg-black w-full object-cover blur-sm scale-110",
-            "transition-opacity duration-700",
+            "transition-opacity duration-700 bg-black",
             active === "A" ? "opacity-100" : "opacity-0",
           ].join(" ")}
           autoPlay
@@ -136,7 +136,7 @@ export default function App() {
           ref={videoBRef}
           className={[
             "absolute inset-0 h-full w-full object-cover blur-sm scale-110",
-            "transition-opacity duration-700",
+            "transition-opacity duration-700 bg-black",
             active === "B" ? "opacity-100" : "opacity-0",
           ].join(" ")}
           autoPlay
@@ -149,7 +149,7 @@ export default function App() {
       </div>
 
       {/* Contenido */}
-      <div className="relative z-10 flex min-h-svh items-center justify-center">
+      <div className="relative z-10 flex min-h-[100dvh] items-center justify-center ">
         <div className="w-full max-w-lg px-8">
           {/* Logo */}
           <motion.div
