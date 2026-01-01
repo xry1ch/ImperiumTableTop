@@ -5,7 +5,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import { User, Users, Minus, Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Spinner } from "@/components/ui/spinner";
-import { Item, ItemContent, ItemMedia, ItemTitle } from "@/components/ui/item";
 
 import imperiumLogo from "../assets/imperiumLogo.png";
 import v1 from "../assets/video/bg1.mp4";
