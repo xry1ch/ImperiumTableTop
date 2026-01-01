@@ -14,6 +14,7 @@ Tras pulsar “Jugar”, aparecen dos botones horizontales:
 
 Individual (icono persona)
 
+
 Grupo (icono varias personas)
 
 Todo mantiene el mismo estilo visual (shadcn + borde dorado suave). La navegación entre pantallas se hace sin router, solo con useState y AnimatePresence.
