@@ -122,34 +122,35 @@ export default function App() {
         <video
           ref={videoARef}
           className={[
-            "absolute inset-0 h-full bg-black w-full object-cover blur-sm scale-110",
-            "transition-opacity duration-700 bg-black",
-            active === "A" ? "opacity-100" : "opacity-0",
+            "absolute inset-0 h-full w-full object-cover blur-sm scale-110 brightness-75",
+            active === "A" ? "z-10" : "z-0",
+            active === "A" ? "pointer-events-auto" : "pointer-events-none",
           ].join(" ")}
-          autoPlay
           muted
           playsInline
           preload="auto"
           onEnded={active === "A" ? handleEnded : undefined}
         />
+
         <video
           ref={videoBRef}
           className={[
-            "absolute inset-0 h-full w-full object-cover blur-sm scale-110",
-            "transition-opacity duration-700 bg-black",
-            active === "B" ? "opacity-100" : "opacity-0",
+            "absolute inset-0 h-full w-full object-cover blur-sm scale-110 brightness-75",
+            active === "B" ? "z-10" : "z-0",
+            active === "B" ? "pointer-events-auto" : "pointer-events-none",
           ].join(" ")}
-          autoPlay
           muted
           playsInline
           preload="auto"
           onEnded={active === "B" ? handleEnded : undefined}
         />
-        <div className="absolute inset-0 bg-black/60" />
+
+        {/* Dark overlay */}
+        <div className="absolute inset-0 bg-black/40 pointer-events-none z-20" />
       </div>
 
       {/* Contenido */}
-      <div className="relative z-10 flex min-h-[100dvh] items-center justify-center ">
+      <div className="relative z-20 flex min-h-[100dvh] items-center justify-center ">
         <div className="w-full max-w-lg px-8">
           {/* Logo */}
           <motion.div
