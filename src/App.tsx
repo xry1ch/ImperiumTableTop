@@ -161,7 +161,7 @@ export default function App() {
             <img
               src={imperiumLogo}
               alt="Imperium"
-              className="h-24 sm:h-28 w-auto select-none"
+              className="h-24 sm:h-28 w-280 select-none"
               draggable={false}
             />
           </motion.div>
