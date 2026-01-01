@@ -4,6 +4,8 @@ import { Input } from "@/components/ui/input";
 import { AnimatePresence, motion } from "framer-motion";
 import { User, Users, Minus, Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { Spinner } from "@/components/ui/spinner";
+import { Item, ItemContent, ItemMedia, ItemTitle } from "@/components/ui/item";
 
 import imperiumLogo from "../assets/imperiumLogo.png";
 import v1 from "../assets/video/bg1.mp4";
@@ -37,6 +39,8 @@ function makePlaylist(items: string[], avoidFirst?: string) {
 export default function Home() {
   const [screen, setScreen] = useState<Screen>("intro");
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [loadingText, setLoadingText] = useState("");
 
   // Grupo: tamaño 2..10
   const [groupCount, setGroupCount] = useState(5);
@@ -64,6 +68,26 @@ export default function Home() {
     const hiddenEl = active === "A" ? videoBRef.current : videoARef.current;
     return { activeEl, hiddenEl };
   };
+
+  function goToIndividual() {
+    if (loading) return;
+
+    const messages = [
+      "Creando imperio...",
+      "Preparando tablero...",
+      "Reclutando legiones...",
+      "Consultando al Senado...",
+    ];
+
+    setLoadingText(messages[Math.floor(Math.random() * messages.length)]);
+    setLoading(true);
+
+    const delay = 600 + Math.random() * 2100;
+
+    window.setTimeout(() => {
+      navigate("/individual");
+    }, delay);
+  }
 
   useEffect(() => {
     const { activeEl, hiddenEl } = getEls();
@@ -202,47 +226,57 @@ export default function Home() {
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 1, ease: [0.4, 1, 0.36, 1] }}
                 >
-                  <div className="grid grid-cols-2 gap-4">
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      className="
-                        h-16 flex-col gap-2
-                        !border-2 !border-amber-400/80
-                        !text-amber-100
-                        hover:!bg-amber-500/10
-                      "
-                      onClick={() => navigate("/individual")}
-                    >
-                      <User className="h-6 w-6" />
-                      <span className="text-base">Individual</span>
-                    </Button>
+                  {loading ? (
+                    <div className="flex flex-col items-center gap-4 text-amber-100">
+                      <Spinner className="h-8 w-8 text-amber-400" />
+                      <span className="text-sm tracking-wide opacity-90">
+                        {loadingText}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-4">
+                      <Button
+                        variant="outline"
+                        size="lg"
+                        className="
+  h-16 flex-col gap-2
+  !border-2 !border-amber-400/80
+  !text-amber-100
+  hover:!bg-amber-500/10
+"
+                        onClick={goToIndividual}
+                      >
+                        <User className="h-6 w-6" />
+                        <span className="text-base">Individual</span>
+                      </Button>
 
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      className="
-                        h-16 flex-col gap-2
-                        !border-2 !border-amber-400/80
-                        !text-amber-100
-                        hover:!bg-amber-500/10
-                      "
-                      onClick={() => setScreen("groupSize")}
-                    >
-                      <Users className="h-6 w-6" />
-                      <span className="text-base">Grupo</span>
-                    </Button>
-                  </div>
-
-                  <div className="mt-4 flex justify-center">
-                    <Button
-                      variant="ghost"
-                      className="text-amber-100/80 hover:text-amber-100"
-                      onClick={() => setScreen("intro")}
-                    >
-                      Volver
-                    </Button>
-                  </div>
+                      <Button
+                        variant="outline"
+                        size="lg"
+                        className="
+  h-16 flex-col gap-2
+  !border-2 !border-amber-400/80
+  !text-amber-100
+  hover:!bg-amber-500/10
+"
+                        onClick={() => setScreen("groupSize")}
+                      >
+                        <Users className="h-6 w-6" />
+                        <span className="text-base">Grupo</span>
+                      </Button>
+                    </div>
+                  )}
+                  {!loading && (
+                    <div className="mt-4 flex justify-center">
+                      <Button
+                        variant="ghost"
+                        className="text-amber-100/80 hover:text-amber-100"
+                        onClick={() => setScreen("intro")}
+                      >
+                        Volver
+                      </Button>
+                    </div>
+                  )}
                 </motion.div>
               ) : screen === "groupSize" ? (
                 <motion.div
