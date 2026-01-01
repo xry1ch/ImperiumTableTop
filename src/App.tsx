@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import imperiumLogo from "./assets/imperiumLogo.png";
-import imperiumBG from "./assets/bg-imperium.jpeg";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AnimatePresence, motion } from "framer-motion";
