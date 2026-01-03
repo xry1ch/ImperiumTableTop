@@ -10,6 +10,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
 import type { CarouselApi } from "@/components/ui/carousel";
 import {
   Carousel,
@@ -19,9 +29,12 @@ import {
 import {
   Crown,
   LogOut,
+  BookUser,
   Users,
+  BookOpen,
+  LayoutGrid,
+  Package,
   ShoppingCart,
-  Menu,
   Swords,
   Wheat,
   TreePine,
@@ -35,6 +48,8 @@ import {
   Shield,
   Sparkles,
   Wand2,
+  Castle,
+  Sword,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -591,7 +606,7 @@ export default function Individual() {
                   {slides.map((slide, idx) => (
                     <CarouselItem key={idx} className="pl-2 h-full">
                       {/* “Zona grande” para swipe */}
-                      <div className="h-full rounded-xl border border-white/10 bg-black/20 p-3">
+                      <div className="h-full rounded-xl border border-white/10 bg-black/20 p-2">
                         <div className="grid grid-cols-2 gap-2 lg:grid-cols-4 lg:gap-4">
                           {slide.cards.map((c) => (
                             <StatCard
@@ -634,7 +649,7 @@ export default function Individual() {
                   hover:!bg-amber-500/10
                 "
               >
-                <Menu className="h-5 w-5" />
+                <BookOpen className="h-5 w-5" />
               </Button>
             </div>
 
@@ -699,20 +714,79 @@ export default function Individual() {
 
             {/* Derecha: compras */}
             <div className="flex justify-end">
-              <Button
-                variant="outline"
-                size="icon"
-                aria-label="Compras"
-                className="
-                  h-11 w-11 rounded-2xl
-                  bg-black/30 backdrop-blur-md
-                  !border-2 !border-amber-400/60
-                  !text-amber-100
-                  hover:!bg-amber-500/10
-                "
-              >
-                <ShoppingCart className="h-5 w-5" />
-              </Button>
+              <Drawer>
+                <DrawerTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    aria-label="Compras"
+                    className="
+          h-11 w-11 rounded-2xl
+          bg-black/30 backdrop-blur-md
+          !border-2 !border-amber-400/60
+          !text-amber-100
+          hover:!bg-amber-500/10
+        "
+                  >
+                    <ShoppingCart className="h-5 w-5" />
+                  </Button>
+                </DrawerTrigger>
+
+                <DrawerContent
+                  className="
+    bg-black
+    text-amber-100
+    border-t-2 border-amber-400/60
+    rounded-t-2xl
+  "
+                >
+                  <div className="p-4">
+                    <div className="grid grid-cols-3 gap-3">
+                      <button
+                        className="
+        flex flex-col items-center justify-center gap-1
+        rounded-xl border-2 border-amber-400/60
+        bg-black/60 p-3
+        text-amber-100
+        hover:bg-amber-400/10
+        transition
+      "
+                      >
+                        <BookOpen className="h-5 w-5" />
+                        <span className="text-xs font-medium">Carta</span>
+                      </button>
+
+                      <button
+                        className="
+        flex flex-col items-center justify-center gap-1
+        rounded-xl border-2 border-amber-400/60
+        bg-black/60 p-3
+        text-amber-100
+        hover:bg-amber-400/10
+        transition
+      "
+                      >
+                        <Castle className="h-5 w-5" />
+                        <span className="text-xs font-medium">Estructura</span>
+                      </button>
+
+                      <button
+                        className="
+        flex flex-col items-center justify-center gap-1
+        rounded-xl border-2 border-amber-400/60
+        bg-black/60 p-3
+        text-amber-100
+        hover:bg-amber-400/10
+        transition
+      "
+                      >
+                        <Sword className="h-5 w-5" />
+                        <span className="text-xs font-medium">Unidad</span>
+                      </button>
+                    </div>
+                  </div>
+                </DrawerContent>
+              </Drawer>
             </div>
           </div>
         </div>
