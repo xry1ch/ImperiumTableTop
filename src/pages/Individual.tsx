@@ -12,12 +12,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   Drawer,
-  DrawerClose,
   DrawerContent,
-  DrawerDescription,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer";
 import type { CarouselApi } from "@/components/ui/carousel";
@@ -29,11 +24,8 @@ import {
 import {
   Crown,
   LogOut,
-  BookUser,
   Users,
   BookOpen,
-  LayoutGrid,
-  Package,
   ShoppingCart,
   Swords,
   Wheat,
@@ -70,13 +62,6 @@ type SharedState = {
   turn: number;
   players: { id: string }[];
   hostId?: string;
-};
-type ResourceCard = {
-  title: string;
-  icon: LucideIcon;
-  amount: number; // banco/stock
-  prod?: number; // producción (opcional)
-  spend?: number; // gasto/consumo (opcional)
 };
 
 function StatCard(props: {
