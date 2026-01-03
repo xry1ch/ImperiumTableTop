@@ -20,6 +20,7 @@ import { supabase } from "@/lib/supabase";
 type SharedState = {
   turn: number;
   players: { id: string }[];
+  hostId?: string;
 };
 
 function StatCard(props: {
@@ -149,9 +150,10 @@ export default function Individual() {
     const already = players.some((p) => p?.id === playerId);
     if (already) return;
 
-    const next: SharedState = {
+    const next = {
       turn: typeof current?.turn === "number" ? current!.turn : 1,
       players: [...players, { id: playerId }],
+      hostId: (current as any)?.hostId ?? (isHost ? playerId : undefined),
     };
 
     await supabase
