@@ -208,9 +208,6 @@ export default function Individual() {
       turn: (typeof shared.turn === "number" ? shared.turn : 1) + 1,
     };
 
-    const from = typeof shared.turn === "number" ? shared.turn : 1;
-    const to = from + 1;
-
     setShared(next);
 
     const { error } = await supabase
