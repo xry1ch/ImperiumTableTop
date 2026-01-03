@@ -27,7 +27,21 @@ import {
   ShoppingCart,
   Menu,
   Swords,
+  Wheat,
+  TreePine,
+  Mountain,
+  Anvil,
+  Coins,
+  Wallet,
+  PawPrint,
+  Factory,
+  ArrowDownRight,
+  ArrowUpRight,
+  Shield,
+  Sparkles,
+  Wand2,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
@@ -37,43 +51,75 @@ type SharedState = {
   players: { id: string }[];
   hostId?: string;
 };
+type ResourceCard = {
+  title: string;
+  icon: LucideIcon;
+  amount: number; // banco/stock
+  prod?: number; // producción (opcional)
+  spend?: number; // gasto/consumo (opcional)
+};
 
 function StatCard(props: {
   title: string;
-  value: string;
-  hint: string;
-  badge: string;
-}) {
-  return (
-    <Card
-      className="
-        bg-black/30 backdrop-blur-md
-        border-white/10
-        shadow-[0_0_0_1px_rgba(255,255,255,0.06)]
-      "
-    >
-      <CardHeader className="p-3 pb-2 space-y-2">
-        <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-xs text-amber-100/75">
-            {props.title}
-          </CardTitle>
-          <Badge
-            variant="outline"
-            className="h-6 px-2 text-[11px] border-amber-400/40 text-amber-100/70"
-          >
-            {props.badge}
-          </Badge>
-        </div>
-        <div className="text-2xl font-semibold leading-none text-amber-100">
-          {props.value}
-        </div>
-      </CardHeader>
+  amount: number;
+  icon: LucideIcon;
 
-      <CardContent className="p-3 pt-0">
-        <div className="flex items-center gap-2 text-[11px] text-amber-100/65">
-          <TrendingUp className="h-3.5 w-3.5" />
-          <span className="line-clamp-1">{props.hint}</span>
+  // Opcionales (para recursos)
+  prod?: number;
+  spend?: number;
+
+  // Control explícito (por si un día quieres ocultar aunque haya 0)
+  showFlow?: boolean;
+}) {
+  const Icon = props.icon;
+
+  const hasProd = typeof props.prod === "number";
+  const hasSpend = typeof props.spend === "number";
+
+  // Si showFlow no viene, se muestra solo si hay prod o spend definidos
+  const showFlow = props.showFlow ?? (hasProd || hasSpend);
+
+  const prod = props.prod ?? 0;
+  const spend = props.spend ?? 0;
+
+  return (
+    <Card className="bg-black/30 backdrop-blur-md border-white/10 shadow-[0_0_0_1px_rgba(255,255,255,0.06)]">
+      <CardContent className="p-3">
+        {/* Top row: izquierda (icono+título) / derecha (valor) */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <Icon className="h-4 w-4 text-amber-200/90" />
+              <div className="truncate text-xs font-medium text-amber-100/80">
+                {props.title}
+              </div>
+            </div>
+          </div>
+
+          <div className="text-right">
+            <div className="text-3xl font-semibold leading-none text-amber-100">
+              {props.amount}
+            </div>
+          </div>
         </div>
+
+        {/* Bottom row: prod/spend opcional */}
+        {showFlow ? (
+          <div className="mt-3 flex items-center gap-4 text-xs">
+            <div className="flex items-center gap-1">
+              <ArrowUpRight className="h-4 w-4 text-emerald-400" />
+              <span className="text-emerald-300 font-medium">+{prod}</span>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <ArrowDownRight className="h-4 w-4 text-rose-400" />
+              <span className="text-rose-300 font-medium">-{spend}</span>
+            </div>
+          </div>
+        ) : (
+          // pequeño “aire” para que no cambie mucho el alto entre cards
+          <div className="mt-3 h-4" />
+        )}
       </CardContent>
     </Card>
   );
@@ -108,24 +154,24 @@ export default function Individual() {
     {
       title: "Resumen",
       cards: [
-        { title: "Vida", value: String(hp), badge: "Local", hint: "Solo tú" },
-        { title: "Oro", value: String(gold), badge: "Local", hint: "Solo tú" },
-        { title: "Turno", value: turn, badge: "Sala", hint: "Compartido" },
-        {
-          title: "Amenaza",
-          value: String(threat),
-          badge: "Local",
-          hint: "Solo tú",
-        },
+        { title: "Población", icon: Users, amount: 0, showFlow: false },
+        { title: "Comida", icon: Wheat, amount: 0, prod: 0, spend: 0 },
+        { title: "Madera", icon: TreePine, amount: 0, prod: 0, spend: 0 },
+        { title: "Piedra", icon: Mountain, amount: 0, prod: 0, spend: 0 },
+        { title: "Hierro", icon: Anvil, amount: 0, prod: 0, spend: 0 },
+        { title: "Oro", icon: Coins, amount: 0, prod: 0, spend: 0 },
+        { title: "Caballos", icon: PawPrint, amount: 0, prod: 0, spend: 0 },
+        { title: "Dinero", icon: Wallet, amount: 212520, prod: 0, spend: 0 },
       ],
     },
     {
       title: "Combate",
       cards: [
-        { title: "Daño", value: "—", badge: "Local", hint: "Placeholder" },
-        { title: "Defensa", value: "—", badge: "Local", hint: "Placeholder" },
-        { title: "Crítico", value: "—", badge: "Local", hint: "Placeholder" },
-        { title: "Buffs", value: "—", badge: "Local", hint: "Placeholder" },
+        // lo dejamos como estaba o lo adaptamos luego a otro tipo de card
+        { title: "Daño", icon: Swords, amount: 0, prod: 0, spend: 0 },
+        { title: "Defensa", icon: Shield, amount: 0, prod: 0, spend: 0 },
+        { title: "Crítico", icon: Sparkles, amount: 0, prod: 0, spend: 0 },
+        { title: "Buffs", icon: Wand2, amount: 0, prod: 0, spend: 0 },
       ],
     },
   ];
@@ -284,7 +330,24 @@ export default function Individual() {
     <div className="relative min-h-[100dvh] w-full text-amber-100 overflow-hidden">
       {/* Fondo */}
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute inset-0 bg-gradient-to-b from-stone-950 via-black to-stone-950" />
+        <div
+          className="absolute inset-0"
+          style={{
+            background: `
+      radial-gradient(
+        140% 120% at 50% -10%,
+        oklch(82.8% 0.189 84.429 / 0.35),
+        transparent 70%
+      ),
+      linear-gradient(
+        180deg,
+        oklch(82.8% 0.189 84.429 / 0.20),
+        oklch(0.87 0.06 73.05 / 0.18) 40%,
+        oklch(0.87 0.06 73.05 / 0.22)
+      )
+    `,
+          }}
+        />
         <div className="absolute -top-24 left-1/2 h-64 w-64 -translate-x-1/2 rounded-full bg-amber-500/10 blur-3xl" />
         <div className="absolute bottom-[-120px] right-[-80px] h-72 w-72 rounded-full bg-white/5 blur-3xl" />
         <div className="absolute inset-0 bg-black/45" />
@@ -383,10 +446,10 @@ export default function Individual() {
         ) : (
           <div className="flex flex-1 flex-col">
             {/* Carousel + Header reactivo */}
-              <div className="mt-10 flex-1 flex flex-col">
+            <div className="mt-10 flex-1 flex flex-col">
               {/* Header único (reactivo) */}
               <div className="mb-3 flex items-center justify-between">
-                <div className="text-sm font-semibold text-amber-100/90">
+                <div className="ml-2 text-bg font-semibold text-amber-100/90">
                   {slides[active]?.title ?? "—"}
                 </div>
 
@@ -428,9 +491,10 @@ export default function Individual() {
                             <StatCard
                               key={`${slide.title}-${c.title}`}
                               title={c.title}
-                              value={c.value}
-                              badge={c.badge}
-                              hint={c.hint}
+                              icon={c.icon}
+                              amount={c.amount}
+                              prod={c.prod}
+                              spend={c.spend}
                             />
                           ))}
                         </div>
