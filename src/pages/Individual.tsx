@@ -1,6 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,13 +15,10 @@ import {
   Carousel,
   CarouselContent,
   CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
 } from "@/components/ui/carousel";
 import {
   Crown,
   LogOut,
-  TrendingUp,
   Users,
   ShoppingCart,
   Menu,
@@ -34,7 +30,6 @@ import {
   Coins,
   Wallet,
   PawPrint,
-  Factory,
   ArrowDownRight,
   ArrowUpRight,
   Shield,
@@ -43,8 +38,17 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
+
+function getAmountSize(value: number) {
+  const digits = Math.abs(value).toString().length;
+
+  if (digits <= 3) return "text-3xl"; // 0 – 999
+  if (digits <= 5) return "text-2xl"; // 1k – 99k
+  if (digits <= 7) return "text-xl"; // 100k – 9M
+  return "text-lg"; // 10M+
+}
 
 type SharedState = {
   turn: number;
@@ -97,7 +101,15 @@ function StatCard(props: {
           </div>
 
           <div className="text-right">
-            <div className="text-3xl font-semibold leading-none text-amber-100">
+            <div
+              className={`
+              ${getAmountSize(props.amount)}
+              font-semibold
+              leading-none
+              text-amber-100
+              tabular-nums
+            `}
+            >
               {props.amount}
             </div>
           </div>
@@ -145,6 +157,72 @@ export default function Individual() {
   const [gold, setGold] = useState(0);
   const [threat, setThreat] = useState(0);
 
+  // Long-press para pasar turno (solo host)
+  const HOLD_MS = 900; // 0.9s (ajústalo a 800/1000 si quieres)
+  const [holdProgress, setHoldProgress] = useState(0); // 0..1
+
+  const holdRaf = useRef<number | null>(null);
+  const holdStart = useRef<number>(0);
+  const holdTriggered = useRef(false);
+
+  function stopHold(reset = true) {
+    if (holdRaf.current) {
+      cancelAnimationFrame(holdRaf.current);
+      holdRaf.current = null;
+    }
+    holdTriggered.current = false;
+    if (reset) setHoldProgress(0);
+  }
+
+  async function advanceTurn() {
+    if (!roomId || !shared) return;
+
+    const next: SharedState = {
+      ...shared,
+      turn: (typeof shared.turn === "number" ? shared.turn : 1) + 1,
+    };
+
+    // Optimista: actualizamos local y persistimos
+    setShared(next);
+
+    const { error } = await supabase
+      .from("room_state")
+      .update({ state: next })
+      .eq("room_id", roomId);
+
+    if (error) {
+      console.error(error);
+      // si falla, podrías revertir, pero de momento solo log
+    }
+  }
+
+  function startHold() {
+    if (!isHost) return;
+    if (!roomId || !shared) return;
+
+    stopHold(true);
+    holdStart.current = performance.now();
+    holdTriggered.current = false;
+
+    const tick = (now: number) => {
+      const t = (now - holdStart.current) / HOLD_MS;
+      const p = Math.min(1, Math.max(0, t));
+      setHoldProgress(p);
+
+      if (p >= 1 && !holdTriggered.current) {
+        holdTriggered.current = true;
+        stopHold(false);
+        setHoldProgress(0);
+        advanceTurn();
+        return;
+      }
+
+      holdRaf.current = requestAnimationFrame(tick);
+    };
+
+    holdRaf.current = requestAnimationFrame(tick);
+  }
+
   const players = Array.isArray(shared?.players) ? shared!.players : [];
   const playerCount = players.length;
   const ready = playerCount >= 2;
@@ -161,7 +239,7 @@ export default function Individual() {
         { title: "Hierro", icon: Anvil, amount: 0, prod: 0, spend: 0 },
         { title: "Oro", icon: Coins, amount: 0, prod: 0, spend: 0 },
         { title: "Caballos", icon: PawPrint, amount: 0, prod: 0, spend: 0 },
-        { title: "Dinero", icon: Wallet, amount: 212520, prod: 0, spend: 0 },
+        { title: "Dinero", icon: Wallet, amount: 0, prod: 0, spend: 0 },
       ],
     },
     {
@@ -532,21 +610,63 @@ export default function Individual() {
               </Button>
             </div>
 
-            {/* Centro: turno actual + icono */}
+            {/* Centro: turno (host = mantener para pasar) */}
             <div className="flex justify-center">
-              <div
-                className="
-                  inline-flex items-center gap-2
-                  rounded-2xl
-                  border border-white/10
-                  bg-black/25
-                  px-4 py-2
-                  text-amber-100
-                "
-              >
-                <Swords className="h-4 w-4" />
-                <span className="text-sm font-semibold">Turno {turn}</span>
-              </div>
+              {(() => {
+                const baseBorder = isHost
+                  ? "rgba(251, 191, 36, 0.6)" // amber-400/60
+                  : "rgba(255, 255, 255, 0.2)"; // white/20
+
+                const ringColor = "rgba(34, 197, 94, 0.85)"; // green-500-ish
+
+                // conic-gradient: verde hasta el progreso, el resto baseBorder
+                const bg = `conic-gradient(${ringColor} ${
+                  holdProgress * 360
+                }deg, ${baseBorder} 0deg)`;
+
+                return (
+                  <div
+                    className={[
+                      "relative h-14 w-14 rounded-full",
+                      "select-none touch-none",
+                      isHost ? "cursor-pointer" : "cursor-default",
+                    ].join(" ")}
+                    style={{ background: bg }}
+                    aria-label={
+                      isHost
+                        ? `Mantén para pasar turno ${turn}`
+                        : `Turno ${turn}`
+                    }
+                    onPointerDown={(e) => {
+                      if (!isHost) return;
+                      e.currentTarget.setPointerCapture?.(e.pointerId);
+                      startHold();
+                    }}
+                    onPointerUp={() => stopHold(true)}
+                    onPointerCancel={() => stopHold(true)}
+                    onPointerLeave={() => stopHold(true)}
+                    onContextMenu={(e) => {
+                      if (isHost) e.preventDefault();
+                    }}
+                  >
+                    {/* Interior (mantiene tu diseño original) */}
+                    <div
+                      className="
+            absolute inset-[1px] rounded-full
+            bg-black/25
+            text-amber-100
+            inline-flex items-center justify-center gap-1.5
+            leading-none
+          "
+                    >
+                      <Swords className="h-4 w-4" />
+                      <span className="text-[16px] font-semibold tabular-nums">
+                        {turn}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Derecha: compras */}
