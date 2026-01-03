@@ -2,7 +2,17 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RotateCcw, TrendingUp } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Crown, LogOut, TrendingUp, Users } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
@@ -55,7 +65,7 @@ function StatCard(props: {
 
 export default function Individual() {
   const navigate = useNavigate();
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
 
   const roomId = params.get("room");
   const roomCode = params.get("code");
@@ -64,12 +74,16 @@ export default function Individual() {
   const [shared, setShared] = useState<SharedState | null>(null);
   const [loadingRoom, setLoadingRoom] = useState(!!roomId);
 
-  // ✅ Local-only stats (por jugador)
+  // AlertDialog abandonar
+  const [leaveOpen, setLeaveOpen] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+
+  // ✅ Local-only stats
   const [hp, setHp] = useState(20);
   const [gold, setGold] = useState(0);
   const [threat, setThreat] = useState(0);
 
-  // PlayerId persistente (para localStorage / presencia)
+  // PlayerId persistente
   const playerId = useMemo(() => {
     const key = "imperium_player_id";
     const existing = localStorage.getItem(key);
@@ -87,7 +101,6 @@ export default function Individual() {
     if (!roomId) return;
     const key = `imperium:local:${roomId}:${playerId}`;
 
-    // cargar
     const raw = localStorage.getItem(key);
     if (raw) {
       try {
@@ -105,11 +118,30 @@ export default function Individual() {
     localStorage.setItem(key, JSON.stringify({ hp, gold, threat }));
   }, [roomId, playerId, hp, gold, threat]);
 
-  function handleReset() {
-    navigate("/");
+  // Abandonar sala (RPC)
+  async function leaveRoom() {
+    if (!roomId || leaving) {
+      navigate("/");
+      return;
+    }
+
+    setLeaving(true);
+    try {
+      const { error } = await supabase.rpc("leave_room", {
+        p_room_id: roomId,
+        p_player_id: playerId,
+      });
+      if (error) throw error;
+    } catch (e) {
+      console.error(e);
+      // Aunque falle, nos vamos igual para UX; si quieres lo hacemos más estricto
+    } finally {
+      setLeaving(false);
+      navigate("/");
+    }
   }
 
-  // Asegura que este player está en la sala (presence mínima)
+  // Asegura que este player está en la sala
   async function ensurePlayerInRoom(current: SharedState | null) {
     if (!roomId) return;
 
@@ -128,50 +160,6 @@ export default function Individual() {
       .eq("room_id", roomId);
     setShared(next);
   }
-  useEffect(() => {
-    // Si ya tenemos room, no hacemos nada
-    if (roomId) return;
-
-    // Si no hay code, no podemos unir
-    if (!roomCode) {
-      setLoadingRoom(false);
-      return;
-    }
-
-    let cancelled = false;
-
-    (async () => {
-      try {
-        setLoadingRoom(true);
-
-        const code = roomCode.trim().toUpperCase();
-        const { data, error } = await supabase.rpc("join_room", {
-          p_code: code,
-        });
-        if (error) throw error;
-
-        const newRoomId = data as string;
-
-        if (cancelled) return;
-
-        // Actualiza la URL para que el resto del componente funcione
-        setParams((prev) => {
-          const next = new URLSearchParams(prev);
-          next.set("room", newRoomId);
-          next.set("code", code);
-          // host no lo ponemos: quien se une no es host
-          return next;
-        });
-      } catch (e) {
-        console.error(e);
-        if (!cancelled) setLoadingRoom(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [roomId, roomCode, setParams]);
 
   useEffect(() => {
     if (!roomId) {
@@ -195,7 +183,6 @@ export default function Individual() {
         const s = data.state as SharedState;
         setShared(s);
 
-        // ✅ el host cuenta como jugador 1 (y cualquier joiner se añade)
         await ensurePlayerInRoom(s);
       } catch (e) {
         console.error(e);
@@ -209,14 +196,19 @@ export default function Individual() {
       .on(
         "postgres_changes",
         {
-          event: "UPDATE",
+          event: "*",
           schema: "public",
           table: "room_state",
           filter: `room_id=eq.${roomId}`,
         },
         (payload) => {
+          // Si la sala se borra, puede llegarte DELETE
+          if ((payload as any).eventType === "DELETE") {
+            navigate("/");
+            return;
+          }
           const next = (payload.new as any)?.state as SharedState;
-          setShared(next);
+          if (next) setShared(next);
         }
       )
       .subscribe();
@@ -225,17 +217,16 @@ export default function Individual() {
       mounted = false;
       supabase.removeChannel(channel);
     };
-  }, [roomId, playerId]);
+  }, [roomId, playerId, navigate]);
 
   const players = Array.isArray(shared?.players) ? shared!.players : [];
   const playerCount = players.length;
   const ready = playerCount >= 2;
-
   const turn = String(shared?.turn ?? 1);
 
   return (
     <div className="relative min-h-[100dvh] w-full bg-black text-amber-100 overflow-hidden">
-      {/* Fondo elegante */}
+      {/* Fondo */}
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute inset-0 bg-gradient-to-b from-stone-950 via-black to-stone-950" />
         <div className="absolute -top-24 left-1/2 h-64 w-64 -translate-x-1/2 rounded-full bg-amber-500/10 blur-3xl" />
@@ -243,13 +234,13 @@ export default function Individual() {
         <div className="absolute inset-0 bg-black/45" />
       </div>
 
-      {/* Reset */}
+      {/* Abandonar */}
       <div className="absolute right-2 top-2 z-20">
         <Button
           variant="outline"
           size="icon"
-          onClick={handleReset}
-          aria-label="Reset y volver al inicio"
+          onClick={() => setLeaveOpen(true)}
+          aria-label="Abandonar sala"
           className="
             h-10 w-10
             bg-black/30 backdrop-blur-md
@@ -258,29 +249,64 @@ export default function Individual() {
             hover:!bg-amber-500/10
           "
         >
-          <RotateCcw className="h-5 w-5" />
+          <LogOut className="h-5 w-5" />
         </Button>
       </div>
 
+      <AlertDialog open={leaveOpen} onOpenChange={setLeaveOpen}>
+        <AlertDialogContent className="bg-black/90 border-amber-400/40">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-amber-100">
+              ¿Abandonar la sala?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-amber-100/70">
+              Saldrás de la partida. Si eres el último jugador, la sala se
+              eliminará.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              className="bg-transparent text-amber-100/80 hover:text-amber-100"
+              disabled={leaving}
+            >
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                leaveRoom();
+              }}
+              className="
+                !border-2 !border-amber-400/80
+                !text-amber-100
+                hover:!bg-amber-500/10
+              "
+            >
+              {leaving ? "Abandonando…" : "Abandonar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-6xl flex-col px-3 py-3">
+        {/* Header compacto (sin “Modo Individual” / “Panel de partida”) */}
         <div className="mb-2 pr-12">
-          <h1 className="font-serif text-lg tracking-wide">Modo Individual</h1>
-
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-xs text-amber-100/60 line-clamp-1">
-              Panel de partida
-            </p>
-
             {roomCode && (
               <span className="text-[11px] text-amber-100/60">
-                · Sala{" "}
+                Sala{" "}
                 <span className="font-mono text-amber-100/80">{roomCode}</span>
-                {isHost ? " (host)" : ""}
               </span>
             )}
 
-            <span className="text-[11px] text-amber-100/60">
-              · Jugadores{" "}
+            {isHost && (
+              <span className="inline-flex items-center gap-1 text-[11px] text-amber-100/60">
+                <Crown className="h-3.5 w-3.5" />
+              </span>
+            )}
+
+            <span className="inline-flex items-center gap-1 text-[11px] text-amber-100/60">
+              <Users className="h-3.5 w-3.5" />
               <span className="font-mono text-amber-100/80">{playerCount}</span>
             </span>
           </div>
@@ -300,7 +326,6 @@ export default function Individual() {
         ) : (
           <>
             <div className="grid grid-cols-2 gap-2 lg:grid-cols-4 lg:gap-4">
-              {/* Local-only */}
               <StatCard
                 title="Vida"
                 value={String(hp)}
@@ -313,7 +338,6 @@ export default function Individual() {
                 badge="Local"
                 hint="Solo tú"
               />
-              {/* Shared */}
               <StatCard
                 title="Turno"
                 value={turn}
