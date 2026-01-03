@@ -40,6 +40,7 @@ import type { LucideIcon } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { AnimatePresence, motion } from "framer-motion";
 
 function getAmountSize(value: number) {
   const digits = Math.abs(value).toString().length;
@@ -165,6 +166,31 @@ export default function Individual() {
   const holdStart = useRef<number>(0);
   const holdTriggered = useRef(false);
 
+  const [turnAnim, setTurnAnim] = useState<{ from: number; to: number } | null>(
+    null
+  );
+  const prevTurnRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const current = typeof shared?.turn === "number" ? shared.turn : null;
+    if (current == null) return;
+
+    // Primera carga: no animar
+    if (prevTurnRef.current == null) {
+      prevTurnRef.current = current;
+      return;
+    }
+
+    const prev = prevTurnRef.current;
+
+    // Solo animar si cambia (normalmente sube, pero sirve igual si baja)
+    if (current !== prev) {
+      setTurnAnim({ from: prev, to: current });
+      window.setTimeout(() => setTurnAnim(null), 1400);
+      prevTurnRef.current = current;
+    }
+  }, [shared?.turn]);
+
   function stopHold(reset = true) {
     if (holdRaf.current) {
       cancelAnimationFrame(holdRaf.current);
@@ -182,7 +208,9 @@ export default function Individual() {
       turn: (typeof shared.turn === "number" ? shared.turn : 1) + 1,
     };
 
-    // Optimista: actualizamos local y persistimos
+    const from = typeof shared.turn === "number" ? shared.turn : 1;
+    const to = from + 1;
+
     setShared(next);
 
     const { error } = await supabase
@@ -689,6 +717,113 @@ export default function Individual() {
           </div>
         </div>
       </nav>
+      <AnimatePresence>
+        {turnAnim && (
+          <motion.div
+            key="turn-overlay"
+            className="
+        fixed inset-0 z-50
+        flex items-center justify-center
+        bg-black/60 backdrop-blur-sm
+        pointer-events-none
+      "
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+          >
+            {/* Card central */}
+            <motion.div
+              className="
+          relative rounded-2xl
+          border border-white/10
+          bg-black/35
+          px-8 py-6
+          text-center text-amber-100
+          shadow-[0_0_0_1px_rgba(255,255,255,0.06)]
+        "
+              initial={{ scale: 0.92, y: 10 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.98, y: 6 }}
+              transition={{ type: "spring", stiffness: 320, damping: 26 }}
+            >
+              {/* Destello de fondo animado */}
+              <>
+                {/* Halo radial */}
+                <motion.div
+                  className="pointer-events-none absolute inset-0 rounded-2xl"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.6, ease: "easeOut" }}
+                  style={{
+                    background:
+                      "radial-gradient(60% 60% at 50% 50%, rgba(34,197,94,0.18), transparent 70%)",
+                  }}
+                />
+
+                {/* Sweep horizontal (acompaña el cambio de turno) */}
+                <motion.div
+                  className="pointer-events-none absolute inset-y-0 left-[-30%] w-[60%]"
+                  initial={{ x: 0, opacity: 0 }}
+                  animate={{ x: "160%", opacity: 0.35 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 1.2, ease: "easeInOut" }}
+                  style={{
+                    background:
+                      "linear-gradient(90deg, transparent, rgba(34,197,94,0.25), transparent)",
+                  }}
+                />
+              </>
+
+              <div className="mb-2 text-[11px] tracking-[0.25em] text-amber-200/70">
+                TURNO
+              </div>
+
+              {/* Swap de números (lento: sale a la izq, entra por la der) */}
+              <div className="relative h-[72px] w-[220px] mx-auto overflow-hidden">
+                {/* Turno actual (sale) */}
+                <motion.div
+                  key={`from-${turnAnim.from}`}
+                  className="absolute inset-0 flex items-center justify-center text-6xl font-semibold tabular-nums"
+                  initial={{ x: 0, opacity: 1 }}
+                  animate={{ x: -60, opacity: 0 }}
+                  transition={{ duration: 0.7, ease: "easeInOut" }}
+                >
+                  {turnAnim.from}
+                </motion.div>
+
+                {/* Turno siguiente (entra) */}
+                <motion.div
+                  key={`to-${turnAnim.to}`}
+                  className="absolute inset-0 flex items-center justify-center text-6xl font-semibold tabular-nums text-emerald-300"
+                  initial={{ x: 60, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  transition={{
+                    duration: 0.85,
+                    ease: "easeInOut",
+                    delay: 0.15,
+                  }}
+                >
+                  {turnAnim.to}
+                </motion.div>
+              </div>
+
+              {/* Aro sutil “pro” */}
+              <motion.div
+                className="pointer-events-none absolute -inset-2 rounded-[22px]"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                style={{
+                  boxShadow:
+                    "0 0 0 1px rgba(34,197,94,0.25), 0 0 40px rgba(34,197,94,0.12)",
+                }}
+              />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
