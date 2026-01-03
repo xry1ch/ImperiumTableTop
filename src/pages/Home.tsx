@@ -2,11 +2,20 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AnimatePresence, motion } from "framer-motion";
-import { User, Users, Minus, Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Spinner } from "@/components/ui/spinner";
 import { createRoom } from "@/lib/rooms";
 import { supabase } from "@/lib/supabase";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 import imperiumLogo from "../assets/imperiumLogo.png";
 import v1 from "../assets/video/bg1.mp4";
@@ -16,12 +25,7 @@ import v4 from "../assets/video/bg4.mp4";
 import v5 from "../assets/video/bg5.mp4";
 import v6 from "../assets/video/bg6.mp4";
 
-type Screen =
-  | "intro"
-  | "mode"
-  | "individualMenu"
-  | "groupSize"
-  | "groupPlayers";
+type Screen = "intro" | "individualMenu";
 
 function shuffle<T>(arr: T[]) {
   const a = [...arr];
@@ -45,20 +49,15 @@ function makePlaylist(items: string[], avoidFirst?: string) {
 export default function Home() {
   const [screen, setScreen] = useState<Screen>("intro");
   const navigate = useNavigate();
+
   const [loading, setLoading] = useState(false);
   const [loadingText, setLoadingText] = useState("");
 
-  // Individual join UI
+  const [joinErrorOpen, setJoinErrorOpen] = useState(false);
+
+  // Join UI
   const [joinOpen, setJoinOpen] = useState(false);
   const [joinCode, setJoinCode] = useState("");
-
-  // Grupo: tamaño 2..10
-  const [groupCount, setGroupCount] = useState(5);
-  const MIN_GROUP = 2;
-  const MAX_GROUP = 10;
-
-  // Nombres de jugadores
-  const [players, setPlayers] = useState<string[]>([]);
 
   const videos = useMemo(() => [v1, v2, v3, v4, v5, v6], []);
   const [playlist, setPlaylist] = useState<string[]>(() =>
@@ -79,24 +78,6 @@ export default function Home() {
     return { activeEl, hiddenEl };
   };
 
-  // Ahora "Individual" abre menú (sin navegar)
-  function goToIndividual() {
-    if (loading) return;
-
-    // Si quieres mantener el spinner aquí también, puedes dejarlo.
-    // Pero como ahora queremos menú, lo quitamos:
-    setLoading(false);
-    setLoadingText("");
-    setJoinOpen(false);
-    setJoinCode("");
-    setScreen("individualMenu");
-  }
-
-  function goToIndividualJoin() {
-    // Aquí todavía no hacemos Supabase; solo UI.
-    setJoinOpen(true);
-  }
-
   async function handleCreateIndividualRoom() {
     if (loading) return;
 
@@ -114,7 +95,6 @@ export default function Home() {
       console.error(e);
       setLoading(false);
       setLoadingText("");
-      // opcional: mostrar error con toast
     }
   }
 
@@ -122,15 +102,23 @@ export default function Home() {
     const code = joinCode.trim().toUpperCase();
     if (!code || loading) return;
 
-    setLoadingText("Uniéndote a la sala...");
+    setLoadingText("Buscando sala...");
     setLoading(true);
 
     try {
-      const { data, error } = await supabase.rpc("join_room", { p_code: code });
+      const { data, error } = await supabase.rpc("join_room_existing", {
+        p_code: code,
+      });
       if (error) throw error;
 
-      const roomId = data as string; // uuid
+      if (!data) {
+        setLoading(false);
+        setLoadingText("");
+        setJoinErrorOpen(true);
+        return;
+      }
 
+      const roomId = data as string;
       navigate(
         `/individual?room=${encodeURIComponent(
           roomId
@@ -140,8 +128,29 @@ export default function Home() {
       console.error(e);
       setLoading(false);
       setLoadingText("");
-      // aquí puedes sacar toast si quieres
     }
+  }
+
+  function openJoin() {
+    if (loading) return;
+    setJoinOpen(true);
+  }
+
+  function backFromJoin() {
+    if (loading) return;
+    setJoinOpen(false);
+    setJoinCode("");
+    setLoading(false);
+    setLoadingText("");
+  }
+
+  function backToIntro() {
+    if (loading) return;
+    setJoinOpen(false);
+    setJoinCode("");
+    setLoading(false);
+    setLoadingText("");
+    setScreen("intro");
   }
 
   useEffect(() => {
@@ -178,22 +187,6 @@ export default function Home() {
     setPos(0);
     setActive((a) => (a === "A" ? "B" : "A"));
   }
-
-  function goToGroupPlayers() {
-    setPlayers((prev) => {
-      const next = [...prev];
-      if (next.length < groupCount) {
-        for (let i = next.length; i < groupCount; i++) next.push("");
-      } else if (next.length > groupCount) {
-        next.length = groupCount;
-      }
-      return next;
-    });
-    setScreen("groupPlayers");
-  }
-
-  const canContinueNames =
-    players.length === groupCount && players.every((n) => n.trim().length > 0);
 
   return (
     <div className="relative min-h-[100dvh] w-full inset-0 overflow-hidden bg-black">
@@ -266,14 +259,20 @@ export default function Home() {
                       !text-amber-100
                       hover:!bg-amber-500/10
                     "
-                    onClick={() => setScreen("mode")}
+                    onClick={() => {
+                      setJoinOpen(false);
+                      setJoinCode("");
+                      setLoading(false);
+                      setLoadingText("");
+                      setScreen("individualMenu");
+                    }}
                   >
                     Jugar
                   </Button>
                 </motion.div>
-              ) : screen === "mode" ? (
+              ) : (
                 <motion.div
-                  key="mode"
+                  key="individualMenu"
                   className="w-full max-w-md"
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -288,326 +287,148 @@ export default function Home() {
                       </span>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-2 gap-4">
-                      <Button
-                        variant="outline"
-                        size="lg"
-                        className="
-                          h-16 flex-col gap-2
-                          !border-2 !border-amber-400/80
-                          !text-amber-100
-                          hover:!bg-amber-500/10
-                        "
-                        onClick={goToIndividual}
-                      >
-                        <User className="h-6 w-6" />
-                        <span className="text-base">Individual</span>
-                      </Button>
-
-                      <Button
-                        variant="outline"
-                        size="lg"
-                        className="
-                          h-16 flex-col gap-2
-                          !border-2 !border-amber-400/80
-                          !text-amber-100
-                          hover:!bg-amber-500/10
-                        "
-                        onClick={() => setScreen("groupSize")}
-                      >
-                        <Users className="h-6 w-6" />
-                        <span className="text-base">Grupo</span>
-                      </Button>
-                    </div>
-                  )}
-
-                  {!loading && (
-                    <div className="mt-4 flex justify-center">
-                      <Button
-                        variant="ghost"
-                        className="text-amber-100/80 hover:text-amber-100"
-                        onClick={() => setScreen("intro")}
-                      >
-                        Volver
-                      </Button>
-                    </div>
-                  )}
-                </motion.div>
-              ) : screen === "individualMenu" ? (
-                <motion.div
-                  key="individualMenu"
-                  className="w-full max-w-md"
-                  initial={{ opacity: 0, y: 16 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 1, ease: [0.4, 1, 0.36, 1] }}
-                >
-                  <div className="grid grid-cols-2 gap-4">
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      className="
-                        h-16 flex-col gap-2
-                        !border-2 !border-amber-400/80
-                        !text-amber-100
-                        hover:!bg-amber-500/10
-                      "
-                      onClick={handleCreateIndividualRoom}
-                    >
-                      <span className="text-base">Crear sala</span>
-                    </Button>
-
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      className="
-                        h-16 flex-col gap-2
-                        !border-2 !border-amber-400/80
-                        !text-amber-100
-                        hover:!bg-amber-500/10
-                      "
-                      onClick={goToIndividualJoin}
-                    >
-                      <span className="text-base">Unirse</span>
-                    </Button>
-                  </div>
-
-                  <AnimatePresence>
-                    {joinOpen && (
-                      <motion.div
-                        className="mt-4 space-y-3"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 10 }}
-                        transition={{
-                          duration: 0.35,
-                          ease: [0.22, 1, 0.36, 1],
-                        }}
-                      >
-                        <Input
-                          value={joinCode}
-                          onChange={(e) =>
-                            setJoinCode(e.target.value.toUpperCase())
-                          }
-                          placeholder="Código de sala (ej: A1B2C3)"
-                          className="
-                            h-12
-                            bg-black/20
-                            text-amber-50
-                            placeholder:text-amber-100/40
-                            border-amber-400/40
-                            focus-visible:ring-amber-400/30
-                          "
-                          inputMode="text"
-                          autoCapitalize="characters"
-                        />
-
-                        <div className="flex justify-end">
-                          <Button
-                            variant="outline"
-                            className="
-                              !border-2 !border-amber-400/80
-                              !text-amber-100
-                              hover:!bg-amber-500/10
-                            "
-                            disabled={!joinCode.trim()}
-                            onClick={submitJoin}
-                          >
-                            Entrar
-                          </Button>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  <div className="mt-4 flex justify-center">
-                    <Button
-                      variant="ghost"
-                      className="text-amber-100/80 hover:text-amber-100"
-                      onClick={() => setScreen("mode")}
-                    >
-                      Volver
-                    </Button>
-                  </div>
-                </motion.div>
-              ) : screen === "groupSize" ? (
-                <motion.div
-                  key="groupSize"
-                  className="w-full max-w-md"
-                  initial={{ opacity: 0, y: 16 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 1, ease: [0.4, 1, 0.36, 1] }}
-                >
-                  <div className="text-center text-amber-100 mb-4">
-                    <div className="text-sm uppercase tracking-widest opacity-80">
-                      Número de jugadores
-                    </div>
-                    <div className="text-5xl font-semibold mt-2">
-                      {groupCount}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-center gap-4">
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      className="
-                        h-14 w-14 p-0
-                        !border-2 !border-amber-400/80
-                        !text-amber-100
-                        hover:!bg-amber-500/10
-                      "
-                      disabled={groupCount <= MIN_GROUP}
-                      onClick={() =>
-                        setGroupCount((n) => Math.max(MIN_GROUP, n - 1))
-                      }
-                      aria-label="Disminuir"
-                    >
-                      <Minus className="h-6 w-6" />
-                    </Button>
-
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      className="
-                        h-14 w-14 p-0
-                        !border-2 !border-amber-400/80
-                        !text-amber-100
-                        hover:!bg-amber-500/10
-                      "
-                      disabled={groupCount >= MAX_GROUP}
-                      onClick={() =>
-                        setGroupCount((n) => Math.min(MAX_GROUP, n + 1))
-                      }
-                      aria-label="Aumentar"
-                    >
-                      <Plus className="h-6 w-6" />
-                    </Button>
-                  </div>
-
-                  <div className="mt-6 flex justify-center gap-3">
-                    <Button
-                      variant="ghost"
-                      className="text-amber-100/80 hover:text-amber-100"
-                      onClick={() => setScreen("mode")}
-                    >
-                      Volver
-                    </Button>
-
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      className="
-                        px-10
-                        !border-2 !border-amber-400/80
-                        !text-amber-100
-                        hover:!bg-amber-500/10
-                      "
-                      onClick={goToGroupPlayers}
-                    >
-                      Continuar
-                    </Button>
-                  </div>
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="groupPlayers"
-                  className="w-full max-w-lg"
-                  initial={{ opacity: 0, y: 16 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 1, ease: [0.4, 1, 0.36, 1] }}
-                >
-                  <div className="mb-4 text-center text-amber-100">
-                    <div className="text-sm uppercase tracking-widest opacity-80">
-                      Nombres de jugadores
-                    </div>
-                  </div>
-
-                  <div className="grid grid-flow-col grid-rows-2 auto-cols-fr gap-3">
-                    {players.map((name, i) => (
-                      <div key={i} className="space-y-2">
-                        <div className="text-xs text-amber-100/70">
-                          Jugador {i + 1}
-                        </div>
-
-                        <Input
-                          value={name}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            setPlayers((prev) => {
-                              const next = [...prev];
-                              next[i] = v;
-                              return next;
-                            });
+                    <AnimatePresence mode="wait">
+                      {!joinOpen ? (
+                        <motion.div
+                          key="menuButtons"
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 10 }}
+                          transition={{
+                            duration: 0.35,
+                            ease: [0.22, 1, 0.36, 1],
                           }}
-                          placeholder="Nombre"
-                          className="
-                            h-12
-                            bg-black/20
-                            text-amber-50
-                            placeholder:text-amber-100/40
-                            border-amber-400/40
-                            focus-visible:ring-amber-400/30
-                          "
-                        />
-                      </div>
-                    ))}
-                  </div>
+                        >
+                          <div className="grid grid-cols-2 gap-4">
+                            <Button
+                              variant="outline"
+                              size="lg"
+                              className="
+                                h-16 flex-col gap-2
+                                !border-2 !border-amber-400/80
+                                !text-amber-100
+                                hover:!bg-amber-500/10
+                              "
+                              onClick={handleCreateIndividualRoom}
+                            >
+                              <span className="text-base">Crear sala</span>
+                            </Button>
 
-                  <div className="mt-4 flex flex-wrap justify-center gap-3">
-                    <Button
-                      variant="ghost"
-                      className="text-amber-100/80 hover:text-amber-100"
-                      onClick={() => setScreen("groupSize")}
-                    >
-                      Volver
-                    </Button>
+                            <Button
+                              variant="outline"
+                              size="lg"
+                              className="
+                                h-16 flex-col gap-2
+                                !border-2 !border-amber-400/80
+                                !text-amber-100
+                                hover:!bg-amber-500/10
+                              "
+                              onClick={openJoin}
+                            >
+                              <span className="text-base">Unirse</span>
+                            </Button>
+                          </div>
 
-                    <Button
-                      variant="outline"
-                      className="
-                        !border-2 !border-amber-400/80
-                        !text-amber-100
-                        hover:!bg-amber-500/10
-                      "
-                      onClick={() =>
-                        setPlayers(
-                          Array.from(
-                            { length: groupCount },
-                            (_, i) => `Jugador ${i + 1}`
-                          )
-                        )
-                      }
-                    >
-                      Autorrellenar
-                    </Button>
+                          <div className="mt-4 flex justify-center">
+                            <Button
+                              variant="ghost"
+                              className="text-amber-100/80 hover:text-amber-100"
+                              onClick={backToIntro}
+                            >
+                              Volver
+                            </Button>
+                          </div>
+                        </motion.div>
+                      ) : (
+                        <motion.div
+                          key="joinForm"
+                          className="w-full"
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 10 }}
+                          transition={{
+                            duration: 0.35,
+                            ease: [0.22, 1, 0.36, 1],
+                          }}
+                        >
+                          <div className="mt-4 space-y-3">
+                            <Input
+                              value={joinCode}
+                              onChange={(e) =>
+                                setJoinCode(e.target.value.toUpperCase())
+                              }
+                              placeholder="Código de sala (ej: A1B2C3)"
+                              className="
+                                h-12
+                                bg-black/20
+                                text-amber-50
+                                placeholder:text-amber-100/40
+                                border-amber-400/40
+                                focus-visible:ring-amber-400/30
+                              "
+                              inputMode="text"
+                              autoCapitalize="characters"
+                            />
 
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      disabled={!canContinueNames}
-                      className="
-                        px-8
-                        !border-2 !border-amber-400/80
-                        !text-amber-100
-                        hover:!bg-amber-500/10
-                        disabled:opacity-50
-                      "
-                      onClick={() => {
-                        console.log("Jugadores:", players);
-                      }}
-                    >
-                      Empezar
-                    </Button>
-                  </div>
+                            <div className="flex items-center justify-between">
+                              <Button
+                                variant="ghost"
+                                className="text-amber-100/80 hover:text-amber-100"
+                                onClick={backFromJoin}
+                              >
+                                Volver
+                              </Button>
+
+                              <Button
+                                variant="outline"
+                                className="
+                                  !border-2 !border-amber-400/80
+                                  !text-amber-100
+                                  hover:!bg-amber-500/10
+                                "
+                                disabled={!joinCode.trim()}
+                                onClick={submitJoin}
+                              >
+                                Entrar
+                              </Button>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
         </div>
       </div>
+      <AlertDialog open={joinErrorOpen} onOpenChange={setJoinErrorOpen}>
+        <AlertDialogContent className="bg-black/90 border-amber-400/40">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-amber-100">
+              Sala no encontrada
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-amber-100/70">
+              No existe ninguna sala con ese código.
+              <br />
+              Revisa el código o crea una sala nueva.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <AlertDialogFooter>
+            <AlertDialogAction
+              className="
+          !border-2 !border-amber-400/80
+          !text-amber-100
+          hover:!bg-amber-500/10
+        "
+            >
+              Entendido
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
