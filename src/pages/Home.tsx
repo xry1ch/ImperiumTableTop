@@ -5,6 +5,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { User, Users, Minus, Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Spinner } from "@/components/ui/spinner";
+import { createRoom } from "@/lib/rooms";
+import { supabase } from "@/lib/supabase";
 
 import imperiumLogo from "../assets/imperiumLogo.png";
 import v1 from "../assets/video/bg1.mp4";
@@ -14,7 +16,12 @@ import v4 from "../assets/video/bg4.mp4";
 import v5 from "../assets/video/bg5.mp4";
 import v6 from "../assets/video/bg6.mp4";
 
-type Screen = "intro" | "mode" | "groupSize" | "groupPlayers";
+type Screen =
+  | "intro"
+  | "mode"
+  | "individualMenu"
+  | "groupSize"
+  | "groupPlayers";
 
 function shuffle<T>(arr: T[]) {
   const a = [...arr];
@@ -40,6 +47,10 @@ export default function Home() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [loadingText, setLoadingText] = useState("");
+
+  // Individual join UI
+  const [joinOpen, setJoinOpen] = useState(false);
+  const [joinCode, setJoinCode] = useState("");
 
   // Grupo: tamaño 2..10
   const [groupCount, setGroupCount] = useState(5);
@@ -68,24 +79,69 @@ export default function Home() {
     return { activeEl, hiddenEl };
   };
 
+  // Ahora "Individual" abre menú (sin navegar)
   function goToIndividual() {
     if (loading) return;
 
-    const messages = [
-      "Creando imperio...",
-      "Preparando tablero...",
-      "Reclutando legiones...",
-      "Consultando al Senado...",
-    ];
+    // Si quieres mantener el spinner aquí también, puedes dejarlo.
+    // Pero como ahora queremos menú, lo quitamos:
+    setLoading(false);
+    setLoadingText("");
+    setJoinOpen(false);
+    setJoinCode("");
+    setScreen("individualMenu");
+  }
 
-    setLoadingText(messages[Math.floor(Math.random() * messages.length)]);
+  function goToIndividualJoin() {
+    // Aquí todavía no hacemos Supabase; solo UI.
+    setJoinOpen(true);
+  }
+
+  async function handleCreateIndividualRoom() {
+    if (loading) return;
+
+    setLoadingText("Forjando sala...");
     setLoading(true);
 
-    const delay = 600 + Math.random() * 2100;
+    try {
+      const room = await createRoom();
+      navigate(
+        `/individual?room=${encodeURIComponent(
+          room.id
+        )}&code=${encodeURIComponent(room.code)}&host=1`
+      );
+    } catch (e) {
+      console.error(e);
+      setLoading(false);
+      setLoadingText("");
+      // opcional: mostrar error con toast
+    }
+  }
 
-    window.setTimeout(() => {
-      navigate("/individual");
-    }, delay);
+  async function submitJoin() {
+    const code = joinCode.trim().toUpperCase();
+    if (!code || loading) return;
+
+    setLoadingText("Uniéndote a la sala...");
+    setLoading(true);
+
+    try {
+      const { data, error } = await supabase.rpc("join_room", { p_code: code });
+      if (error) throw error;
+
+      const roomId = data as string; // uuid
+
+      navigate(
+        `/individual?room=${encodeURIComponent(
+          roomId
+        )}&code=${encodeURIComponent(code)}`
+      );
+    } catch (e) {
+      console.error(e);
+      setLoading(false);
+      setLoadingText("");
+      // aquí puedes sacar toast si quieres
+    }
   }
 
   useEffect(() => {
@@ -124,7 +180,6 @@ export default function Home() {
   }
 
   function goToGroupPlayers() {
-    // Crea o ajusta array de jugadores a groupCount, manteniendo lo ya escrito
     setPlayers((prev) => {
       const next = [...prev];
       if (next.length < groupCount) {
@@ -175,7 +230,7 @@ export default function Home() {
       </div>
 
       {/* Contenido */}
-      <div className="relative z-20 flex min-h-[100dvh] items-center justify-center ">
+      <div className="relative z-20 flex min-h-[100dvh] items-center justify-center">
         <div className="w-full max-w-lg px-8">
           {/* Logo */}
           <motion.div
@@ -238,11 +293,11 @@ export default function Home() {
                         variant="outline"
                         size="lg"
                         className="
-  h-16 flex-col gap-2
-  !border-2 !border-amber-400/80
-  !text-amber-100
-  hover:!bg-amber-500/10
-"
+                          h-16 flex-col gap-2
+                          !border-2 !border-amber-400/80
+                          !text-amber-100
+                          hover:!bg-amber-500/10
+                        "
                         onClick={goToIndividual}
                       >
                         <User className="h-6 w-6" />
@@ -253,11 +308,11 @@ export default function Home() {
                         variant="outline"
                         size="lg"
                         className="
-  h-16 flex-col gap-2
-  !border-2 !border-amber-400/80
-  !text-amber-100
-  hover:!bg-amber-500/10
-"
+                          h-16 flex-col gap-2
+                          !border-2 !border-amber-400/80
+                          !text-amber-100
+                          hover:!bg-amber-500/10
+                        "
                         onClick={() => setScreen("groupSize")}
                       >
                         <Users className="h-6 w-6" />
@@ -265,6 +320,7 @@ export default function Home() {
                       </Button>
                     </div>
                   )}
+
                   {!loading && (
                     <div className="mt-4 flex justify-center">
                       <Button
@@ -276,6 +332,103 @@ export default function Home() {
                       </Button>
                     </div>
                   )}
+                </motion.div>
+              ) : screen === "individualMenu" ? (
+                <motion.div
+                  key="individualMenu"
+                  className="w-full max-w-md"
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 1, ease: [0.4, 1, 0.36, 1] }}
+                >
+                  <div className="grid grid-cols-2 gap-4">
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      className="
+                        h-16 flex-col gap-2
+                        !border-2 !border-amber-400/80
+                        !text-amber-100
+                        hover:!bg-amber-500/10
+                      "
+                      onClick={handleCreateIndividualRoom}
+                    >
+                      <span className="text-base">Crear sala</span>
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      className="
+                        h-16 flex-col gap-2
+                        !border-2 !border-amber-400/80
+                        !text-amber-100
+                        hover:!bg-amber-500/10
+                      "
+                      onClick={goToIndividualJoin}
+                    >
+                      <span className="text-base">Unirse</span>
+                    </Button>
+                  </div>
+
+                  <AnimatePresence>
+                    {joinOpen && (
+                      <motion.div
+                        className="mt-4 space-y-3"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 10 }}
+                        transition={{
+                          duration: 0.35,
+                          ease: [0.22, 1, 0.36, 1],
+                        }}
+                      >
+                        <Input
+                          value={joinCode}
+                          onChange={(e) =>
+                            setJoinCode(e.target.value.toUpperCase())
+                          }
+                          placeholder="Código de sala (ej: A1B2C3)"
+                          className="
+                            h-12
+                            bg-black/20
+                            text-amber-50
+                            placeholder:text-amber-100/40
+                            border-amber-400/40
+                            focus-visible:ring-amber-400/30
+                          "
+                          inputMode="text"
+                          autoCapitalize="characters"
+                        />
+
+                        <div className="flex justify-end">
+                          <Button
+                            variant="outline"
+                            className="
+                              !border-2 !border-amber-400/80
+                              !text-amber-100
+                              hover:!bg-amber-500/10
+                            "
+                            disabled={!joinCode.trim()}
+                            onClick={submitJoin}
+                          >
+                            Entrar
+                          </Button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  <div className="mt-4 flex justify-center">
+                    <Button
+                      variant="ghost"
+                      className="text-amber-100/80 hover:text-amber-100"
+                      onClick={() => setScreen("mode")}
+                    >
+                      Volver
+                    </Button>
+                  </div>
                 </motion.div>
               ) : screen === "groupSize" ? (
                 <motion.div
@@ -372,8 +525,6 @@ export default function Home() {
                     </div>
                   </div>
 
-                  {/* Grid responsive */}
-                  {/* Grid: 2 filas por columna */}
                   <div className="grid grid-flow-col grid-rows-2 auto-cols-fr gap-3">
                     {players.map((name, i) => (
                       <div key={i} className="space-y-2">
@@ -393,13 +544,13 @@ export default function Home() {
                           }}
                           placeholder="Nombre"
                           className="
-          h-12
-          bg-black/20
-          text-amber-50
-          placeholder:text-amber-100/40
-          border-amber-400/40
-          focus-visible:ring-amber-400/30
-        "
+                            h-12
+                            bg-black/20
+                            text-amber-50
+                            placeholder:text-amber-100/40
+                            border-amber-400/40
+                            focus-visible:ring-amber-400/30
+                          "
                         />
                       </div>
                     ))}
@@ -417,10 +568,10 @@ export default function Home() {
                     <Button
                       variant="outline"
                       className="
-        !border-2 !border-amber-400/80
-        !text-amber-100
-        hover:!bg-amber-500/10
-      "
+                        !border-2 !border-amber-400/80
+                        !text-amber-100
+                        hover:!bg-amber-500/10
+                      "
                       onClick={() =>
                         setPlayers(
                           Array.from(
@@ -438,15 +589,14 @@ export default function Home() {
                       size="lg"
                       disabled={!canContinueNames}
                       className="
-        px-8
-        !border-2 !border-amber-400/80
-        !text-amber-100
-        hover:!bg-amber-500/10
-        disabled:opacity-50
-      "
+                        px-8
+                        !border-2 !border-amber-400/80
+                        !text-amber-100
+                        hover:!bg-amber-500/10
+                        disabled:opacity-50
+                      "
                       onClick={() => {
                         console.log("Jugadores:", players);
-                        // TODO: ir a la pantalla de la partida
                       }}
                     >
                       Empezar
