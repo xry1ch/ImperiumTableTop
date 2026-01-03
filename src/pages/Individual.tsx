@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,7 +11,23 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Crown, LogOut, TrendingUp, Users } from "lucide-react";
+import type { CarouselApi } from "@/components/ui/carousel";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
+import {
+  Crown,
+  LogOut,
+  TrendingUp,
+  Users,
+  ShoppingCart,
+  Menu,
+  Swords,
+} from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
@@ -84,6 +99,52 @@ export default function Individual() {
   const [gold, setGold] = useState(0);
   const [threat, setThreat] = useState(0);
 
+  const players = Array.isArray(shared?.players) ? shared!.players : [];
+  const playerCount = players.length;
+  const ready = playerCount >= 2;
+  const turn = String(shared?.turn ?? 1);
+  // Slides del carousel: cada slide contiene un "grid" de cards (como tu sketch)
+  const slides = [
+    {
+      title: "Resumen",
+      cards: [
+        { title: "Vida", value: String(hp), badge: "Local", hint: "Solo tú" },
+        { title: "Oro", value: String(gold), badge: "Local", hint: "Solo tú" },
+        { title: "Turno", value: turn, badge: "Sala", hint: "Compartido" },
+        {
+          title: "Amenaza",
+          value: String(threat),
+          badge: "Local",
+          hint: "Solo tú",
+        },
+      ],
+    },
+    {
+      title: "Combate",
+      cards: [
+        { title: "Daño", value: "—", badge: "Local", hint: "Placeholder" },
+        { title: "Defensa", value: "—", badge: "Local", hint: "Placeholder" },
+        { title: "Crítico", value: "—", badge: "Local", hint: "Placeholder" },
+        { title: "Buffs", value: "—", badge: "Local", hint: "Placeholder" },
+      ],
+    },
+  ];
+
+  const [api, setApi] = useState<CarouselApi | null>(null);
+  const [active, setActive] = useState(0);
+  const [count, setCount] = useState(slides.length);
+
+  useEffect(() => {
+    if (!api) return;
+    const snaps = api.scrollSnapList();
+    setCount(snaps.length);
+    setActive(api.selectedScrollSnap());
+
+    api.on("select", () => {
+      setActive(api.selectedScrollSnap());
+    });
+  }, [api]);
+
   // PlayerId persistente
   const playerId = useMemo(() => {
     const key = "imperium_player_id";
@@ -135,7 +196,6 @@ export default function Individual() {
       if (error) throw error;
     } catch (e) {
       console.error(e);
-      // Aunque falle, nos vamos igual para UX; si quieres lo hacemos más estricto
     } finally {
       setLeaving(false);
       navigate("/");
@@ -204,7 +264,6 @@ export default function Individual() {
           filter: `room_id=eq.${roomId}`,
         },
         (payload) => {
-          // Si la sala se borra, puede llegarte DELETE
           if ((payload as any).eventType === "DELETE") {
             navigate("/");
             return;
@@ -221,13 +280,8 @@ export default function Individual() {
     };
   }, [roomId, playerId, navigate]);
 
-  const players = Array.isArray(shared?.players) ? shared!.players : [];
-  const playerCount = players.length;
-  const ready = playerCount >= 2;
-  const turn = String(shared?.turn ?? 1);
-
   return (
-    <div className="relative min-h-[100dvh] w-full bg-black text-amber-100 overflow-hidden">
+    <div className="relative min-h-[100dvh] w-full text-amber-100 overflow-hidden">
       {/* Fondo */}
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute inset-0 bg-gradient-to-b from-stone-950 via-black to-stone-950" />
@@ -290,8 +344,9 @@ export default function Individual() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <div className="relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-6xl flex-col px-3 py-3">
-        {/* Header compacto (sin “Modo Individual” / “Panel de partida”) */}
+      {/* Contenido */}
+      <div className="relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-6xl flex-col px-3 py-3 pb-24">
+        {/* Header compacto (se queda igual) */}
         <div className="mb-2 pr-12">
           <div className="flex items-center gap-2 flex-wrap">
             {roomCode && (
@@ -326,67 +381,130 @@ export default function Individual() {
             </div>
           </div>
         ) : (
-          <>
-            <div className="grid grid-cols-2 gap-2 lg:grid-cols-4 lg:gap-4">
-              <StatCard
-                title="Vida"
-                value={String(hp)}
-                badge="Local"
-                hint="Solo tú"
-              />
-              <StatCard
-                title="Oro"
-                value={String(gold)}
-                badge="Local"
-                hint="Solo tú"
-              />
-              <StatCard
-                title="Turno"
-                value={turn}
-                badge="Sala"
-                hint="Compartido"
-              />
-              <StatCard
-                title="Amenaza"
-                value={String(threat)}
-                badge="Local"
-                hint="Solo tú"
-              />
+          <div className="flex flex-1 flex-col">
+            {/* Carousel + Header reactivo */}
+              <div className="mt-10 flex-1 flex flex-col">
+              {/* Header único (reactivo) */}
+              <div className="mb-3 flex items-center justify-between">
+                <div className="text-sm font-semibold text-amber-100/90">
+                  {slides[active]?.title ?? "—"}
+                </div>
+
+                <div className="flex items-center gap-2 text-[11px] text-amber-100/60">
+                  {/* Dots (no interactivos) con transición suave */}
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: count }).map((_, i) => (
+                      <span
+                        key={i}
+                        className={[
+                          "rounded-full transition-all duration-200",
+                          i === active
+                            ? "h-1.5 w-5 bg-amber-300/80"
+                            : "h-1.5 w-1.5 bg-white/15",
+                        ].join(" ")}
+                      />
+                    ))}
+                  </div>
+
+                  <span className="font-mono">
+                    {Math.min(active + 1, count)}/{count}
+                  </span>
+                </div>
+              </div>
+
+              {/* Carousel ocupa el resto */}
+              <Carousel
+                setApi={setApi}
+                opts={{ align: "start" }}
+                className="h-full w-full"
+              >
+                <CarouselContent className="-ml-2 h-full">
+                  {slides.map((slide, idx) => (
+                    <CarouselItem key={idx} className="pl-2 h-full">
+                      {/* “Zona grande” para swipe */}
+                      <div className="h-full rounded-xl border border-white/10 bg-black/20 p-3">
+                        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4 lg:gap-4">
+                          {slide.cards.map((c) => (
+                            <StatCard
+                              key={`${slide.title}-${c.title}`}
+                              title={c.title}
+                              value={c.value}
+                              badge={c.badge}
+                              hint={c.hint}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </CarouselItem>
+                  ))}
+                </CarouselContent>
+
+                {/* Sin flechas */}
+              </Carousel>
             </div>
-
-            <Card
-              className="
-                mt-2 flex-1
-                bg-black/30 backdrop-blur-md
-                border-white/10
-                shadow-[0_0_0_1px_rgba(255,255,255,0.06)]
-              "
-            >
-              <CardHeader className="p-3 pb-2 flex flex-row items-center justify-between gap-2">
-                <CardTitle className="text-sm">Resumen</CardTitle>
-
-                <Tabs defaultValue="3m">
-                  <TabsList className="bg-black/20 h-8">
-                    <TabsTrigger className="h-7 text-xs" value="3m">
-                      3m
-                    </TabsTrigger>
-                    <TabsTrigger className="h-7 text-xs" value="30d">
-                      30d
-                    </TabsTrigger>
-                    <TabsTrigger className="h-7 text-xs" value="7d">
-                      7d
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </CardHeader>
-
-              <CardContent className="p-3 pt-0 h-full">
-                <div className="h-36 sm:h-44 w-full rounded-xl border border-white/10 bg-black/20" />
-              </CardContent>
-            </Card>
-          </>
+          </div>
         )}
       </div>
+
+      {/* Bottom menu bar */}
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-black/40 backdrop-blur-md">
+        <div className="mx-auto w-full max-w-6xl px-3 py-2">
+          <div className="grid grid-cols-3 items-center">
+            {/* Izquierda: placeholder */}
+            <div className="flex justify-start">
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label="Placeholder"
+                className="
+                  h-11 w-11 rounded-2xl
+                  bg-black/30 backdrop-blur-md
+                  !border-2 !border-amber-400/40
+                  !text-amber-100
+                  hover:!bg-amber-500/10
+                "
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
+            </div>
+
+            {/* Centro: turno actual + icono */}
+            <div className="flex justify-center">
+              <div
+                className="
+                  inline-flex items-center gap-2
+                  rounded-2xl
+                  border border-white/10
+                  bg-black/25
+                  px-4 py-2
+                  text-amber-100
+                "
+              >
+                <Swords className="h-4 w-4" />
+                <span className="text-sm font-semibold">Turno {turn}</span>
+              </div>
+            </div>
+
+            {/* Derecha: compras */}
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label="Compras"
+                className="
+                  h-11 w-11 rounded-2xl
+                  bg-black/30 backdrop-blur-md
+                  !border-2 !border-amber-400/60
+                  !text-amber-100
+                  hover:!bg-amber-500/10
+                "
+              >
+                <ShoppingCart className="h-5 w-5" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      </nav>
     </div>
   );
 }
